@@ -94,7 +94,8 @@ print( BATCH, ALPHA, BETA, LBD )
 
 ######################################################################################
 
-torch.cuda.set_device(0)
+if torch.cuda.is_available():
+    torch.cuda.set_device(0)
 
 # load data
 train_dataset = datasets.MNIST(
@@ -133,15 +134,27 @@ test_loader = torch.utils.data.DataLoader(
 
     
 # create model
-model = AE_CM().cuda(0)
-
-criterion_reconst = nn.MSELoss(reduction=('mean')).cuda(0)
-criterion_cluster = Clustering_Module_Loss(
-                        num_clusters=10, 
-                        alpha=ALPHA, 
-                        lbd=LBD, 
-                        orth=True, 
-                        normalize=True).cuda(0)
+if torch.cuda.is_available():
+    model = AE_CM().cuda(0)
+else:
+    model = AE_CM()
+if torch.cuda.is_available():
+    criterion_reconst = nn.MSELoss(reduction=('mean')).cuda(0)
+    criterion_cluster = Clustering_Module_Loss(
+                            num_clusters=10,
+                            alpha=ALPHA,
+                            lbd=LBD,
+                            orth=True,
+                            normalize=True).cuda(0)
+else:
+    criterion_reconst = nn.MSELoss(reduction=('mean'))
+    criterion_cluster = Clustering_Module_Loss(
+                            num_clusters=10,
+                            alpha=ALPHA,
+                            lbd=LBD,
+                            orth=True,
+                            normalize=True,
+                            device='cpu')
 
 optim_params = model.parameters()
 optimizer = torch.optim.AdamW(
@@ -159,8 +172,8 @@ def train():
     model.train()
     
     for i, (images, _) in enumerate(train_loader):
-
-        images = images.cuda(0, non_blocking=True)
+        if torch.cuda.is_available():
+            images = images.cuda(0, non_blocking=True)
 
         # compute output and loss
         tx, cm = model(x=images)
@@ -179,7 +192,10 @@ def evaluate(full=False):
     pred,lbl,img = [],[],None
     for i, (images, labels) in enumerate(train_loader):
         if i == 0 or full:
-            img = images.cuda(0, non_blocking=True)
+            if torch.cuda.is_available():
+                 img = images.cuda(0, non_blocking=True)
+            else:
+                 img = images
             tx, cm = model(img)
             _,gamma,_,_ = cm
             pred += gamma.argmax(-1).detach().cpu().tolist()
@@ -214,8 +230,8 @@ def avg_epoch():
     model.train()
     
     for i, (images, _) in enumerate(train_loader):
-
-        images = images.cuda(0, non_blocking=True)
+        if torch.cuda.is_available():
+            images = images.cuda(0, non_blocking=True)
 
         # compute output and loss
         tx, cm = model(x=images)
